@@ -1,0 +1,23 @@
+<launch>
+  <param name="use_sim_time" value="true"/>
+  <arg name="scan_topic" default="stable_scan"/>
+  <arg name="use_builtin" default="true"/>
+
+<!--Not sure what this group does down below:-->
+
+ <group if="$(arg use_builtin)">
+  <include file="$(find neato_2dnav)/launch/includes/amcl.launch.xml">
+    <arg name="scan_topic" value="$(arg scan_topic)"/>
+    <arg name="initial_pose_x" value="0.0"/>
+    <arg name="initial_pose_y" value="0.0"/>
+    <arg name="initial_pose_a" value="0.0"/>
+  </include>
+ </group>
+
+ <group unless="$(arg use_builtin)">
+  <node name="pf" pkg="robot_learning" type="follower.py" output="screen">
+    <remap from="scan" to="$(arg scan_topic)"/>
+  </node>
+</group>
+
+</launch>
