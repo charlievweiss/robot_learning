@@ -4,7 +4,7 @@ import rospy
 import Queue as queue
 from sensor_msgs.msg import LaserScan, Image
 from neato_node.msg import Bump, Accel
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
 from cv_bridge import CvBridge
 import cv2
 import rospkg
@@ -23,6 +23,8 @@ class DataLogger(object):
         self.lbutton_down_registered = False
         self.last_x, self.last_y = -1, -1
         self.q = queue.Queue()
+        self.last_phone_trans = None
+        self.last_phone_orient = None
         self.sensor_latency_tolerance = rospy.Duration(0.5)
 
         rospy.init_node('data_logger')
@@ -41,6 +43,7 @@ class DataLogger(object):
         rospy.Subscriber('bump', Bump, self.process_bump)
         rospy.Subscriber('accel', Accel, self.process_accel)
         rospy.Subscriber('cmd_vel', Twist, self.process_cmd_vel)
+        rospy.Subscriber('april_tags_ios', PoseStamped, self.process_phone)
         self.tf_listener = tf.TransformListener()
         self.b = CvBridge()
         cv2.namedWindow('camera image')
@@ -70,6 +73,20 @@ class DataLogger(object):
     def process_accel(self, msg):
         self.last_accel = (rospy.Time.now(),
                            (msg.accelXInG, msg.accelYInG, msg.accelZInG))
+
+    def process_phone(self, msg):
+        # From april tag detection
+        self.last_phone_trans = (rospy.Time.now(),
+                                 (msg.pose.pose.position.x,
+                                  msg.pose.pose.position.y,
+                                  msg.pose.pose.position.z))
+
+        self.last_phone_orient = (rospy.Time.now(),
+                                 (msg.pose.pose.orientation.x,
+                                  msg.pose.pose.orientation.y,
+                                  msg.pose.pose.orientation.z,
+                                  msg.pose.pose.orientation.w))
+
 
     def process_image(self, m):
         im = self.b.imgmsg_to_cv2(m, desired_encoding="bgr8")
@@ -105,7 +122,14 @@ class DataLogger(object):
                               ['odom_orient_x',
                                'odom_orient_y',
                                'odom_orient_z',
-                               'odom_orient_w']])
+                               'odom_orient_w'] +
+                              ['phone_trans_x',                                  
+                               'phone_trans_y',
+                               'phone_trans_z'] + 
+                              ['phone_orient_x',
+                               'phone_orient_y',
+                               'phone_orient_z',
+                               'phone_orient_w']])
             while not rospy.is_shutdown():
                 stamp, x, y, lbutton_down, image = self.q.get(timeout=10)
 
@@ -129,6 +153,16 @@ class DataLogger(object):
                 if (self.last_accel and abs(stamp - self.last_accel[0]) <
                         self.sensor_latency_tolerance):
                     accel = self.last_accel[1]
+
+                phone_trans = [float('Inf')]*3
+                if (self.last_phone_trans and abs(stamp - self.last_phone_trans[0]) <
+                        self.sensor_latency_tolerance):
+                    phone_trans = self.last_phone_trans[1]
+
+                phone_orient = [float('Inf')]*4
+                if (self.last_phone_orient and abs(stamp - self.last_phone_orient[0]) <
+                        self.sensor_latency_tolerance):
+                    phone_orient = self.last_phone_orient[1]
 
                 # check for odom transform
                 transform_ts = \
@@ -159,7 +193,9 @@ class DataLogger(object):
                                   list(bump) +
                                   list(accel) +
                                   list(trans) +
-                                  list(rot)])
+                                  list(rot) + 
+                                  list(phone_trans) +
+                                  list(phone_orient)])
                 image_count += 1
 
 
