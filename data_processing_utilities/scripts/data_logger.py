@@ -43,7 +43,7 @@ class DataLogger(object):
         rospy.Subscriber('bump', Bump, self.process_bump)
         rospy.Subscriber('accel', Accel, self.process_accel)
         rospy.Subscriber('cmd_vel', Twist, self.process_cmd_vel)
-        rospy.Subscriber('april_tags_ios', PoseStamped, self.process_phone)
+        rospy.Subscriber('/ios_pose', PoseStamped, self.process_phone)
         self.tf_listener = tf.TransformListener()
         self.b = CvBridge()
         cv2.namedWindow('camera image')
@@ -77,15 +77,15 @@ class DataLogger(object):
     def process_phone(self, msg):
         # From april tag detection
         self.last_phone_trans = (rospy.Time.now(),
-                                 (msg.pose.pose.position.x,
-                                  msg.pose.pose.position.y,
-                                  msg.pose.pose.position.z))
+                                 (msg.pose.position.x,
+                                  msg.pose.position.y,
+                                  msg.pose.position.z))
 
         self.last_phone_orient = (rospy.Time.now(),
-                                 (msg.pose.pose.orientation.x,
-                                  msg.pose.pose.orientation.y,
-                                  msg.pose.pose.orientation.z,
-                                  msg.pose.pose.orientation.w))
+                                 (msg.pose.orientation.x,
+                                  msg.pose.orientation.y,
+                                  msg.pose.orientation.z,
+                                  msg.pose.orientation.w))
 
 
     def process_image(self, m):
