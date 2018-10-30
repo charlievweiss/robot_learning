@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
-from geometry_msgs.msg import Point, Twist
+from geometry_msgs.msg import Point, Twist, Vector3, PoseStamped
+from person_velocity import PersonTracker
 import math
 
 """
@@ -13,7 +14,7 @@ class Follower(object):
     def __init__(self):
         rospy.init_node("person_follower")
         # subscribe to person_position topic to get person's 2D point
-        rospy.Subscriber('/person_position',Point,self.get_object_pos)
+        self.person_position_sub = rospy.Subscriber('/person_position',PoseStamped,self.get_object_pos)
         self.publish_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
         # velocity to be published
@@ -28,9 +29,10 @@ class Follower(object):
         self.max_lin_vel = .5
         self.max_ang_vel = .5
 
-    def get_object_pos(self, p):
+    def get_object_pos(self, msg):
         # updates whenever something is published to /person_position
-        self.object_pos = p
+        x, y = PersonTracker.xy_from_pose(msg)
+        self.object_pos = Point(x=x, y=y, z=0)
 
     def calculate_distance(self):
         # calculate the distance between the bot and the person
@@ -62,9 +64,10 @@ class Follower(object):
     def run(self):
         while not rospy.is_shutdown():
             # self.matt_pls()
-            self.calc_movement()
-            self.cmd_vel = Twist(linear=Vector3(x=self.linear_vel), angular=Vector3(z=self.angular_vel)))
-            self.publish_vel.publish(self.cmd_vel)
+            if self.object_pos:
+                self.calc_movement()
+                self.cmd_vel = Twist(linear=Vector3(x=self.linear_vel), angular=Vector3(z=self.angular_vel))
+                self.publish_vel.publish(self.cmd_vel)
 
 if __name__ == '__main__':
     node = Follower()
