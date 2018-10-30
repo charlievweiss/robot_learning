@@ -20,7 +20,7 @@ class PersonTracker(object):
     @staticmethod
     def pose_from_xy(x, y):
         msg = PoseStamped(pose=Pose(position=Point(x, y, 0), orientation=Quaternion(0,0,0,0)))
-        msg.header.frame_id = 'map'
+        msg.header.frame_id = 'odom'
         return msg
 
     @staticmethod
