@@ -3,7 +3,11 @@
   <arg name="scan_topic" default="stable_scan"/>
   <arg name="use_builtin" default="true"/>
 
-<!--Not sure what this group does down below:-->
+  <node pkg="person_framing" type="person_pos.py" name="person_pos" output="screen"/>
+  <node pkg="person_framing" type="follower.py" name="follower" output="screen"/>
+
+
+<!--Not sure what this group does down below:
 
  <group if="$(arg use_builtin)">
   <include file="$(find neato_2dnav)/launch/includes/amcl.launch.xml">
@@ -14,10 +18,19 @@
   </include>
  </group>
 
+
  <group unless="$(arg use_builtin)">
-  <node name="pf" pkg="robot_learning" type="follower.py" output="screen">
+  <node name="follower" pkg="person_framing" type="follower.py" output="screen">
     <remap from="scan" to="$(arg scan_topic)"/>
   </node>
 </group>
+
+
+<group unless="$(arg use_builtin)">
+  <node name="person_velocity" pkg="person_framing" type="person_velocity.py" output="screen">
+    <remap from="scan" to="$(arg scan_topic)"/>
+  </node>
+</group>
+--> 
 
 </launch>
