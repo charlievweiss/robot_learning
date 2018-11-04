@@ -4,13 +4,8 @@ Uses a neural network to determine the person's position on the screen
 
 TODO: 
 
-- Implement network. (Working on it -Charlie)
-- Apply same transforms to image as used for neural net
-- Obtain image from neato
-    CHECK SELF.PROCESS_IMAGE
-    CHECK GET_PREDICTED_POS
-
-Error ideas: Does the image need to be an np array?
+- low pass filter on past predictions
+- black and white training images
 
 """
 
@@ -201,8 +196,8 @@ class PersonTracker(object):
             x,y = self.get_predicted_pos(self.current_image)
             # Turn into PoseStamped
             self.predicted_pos = PersonTracker.pose_from_xy(x,y)
-            #self.person_pub.publish(self.predicted_pos)
-            print(self.predicted_pos)
+            self.person_pub.publish(self.predicted_pos)
+            #print(self.predicted_pos)
 
             """# Really scarily shows a bunch of images, but hey, we get images.
             cv2.imshow("camera image",self.image)

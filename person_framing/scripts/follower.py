@@ -55,10 +55,12 @@ class Follower(object):
         # TODO: Move this block to init.
         target_distance = 1
         distance_tolerance = 0.1  # don't move if distance is within this range
-        angle_tolerance = math.radians(5)
+        angle_tolerance = math.radians(1)
 
         object_distance, object_angle = self.get_polar_baselink_object_pos()
         print("object_distance = {}\nobject_angle  = {}".format(object_distance, object_angle))
+
+
 
         if object_angle > angle_tolerance:
             angular_vel = -1 * self.max_ang_vel
@@ -109,6 +111,7 @@ class Follower(object):
                 linear_vel, angular_vel = self.calc_movement()
                 cmd_vel = Twist(linear=Vector3(x=linear_vel), angular=Vector3(z=angular_vel))
                 self.publish_vel.publish(cmd_vel)
+                #print(cmd_vel)
 
 if __name__ == '__main__':
     node = Follower()
