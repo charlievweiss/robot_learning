@@ -10,6 +10,8 @@ TODO:
     CHECK SELF.PROCESS_IMAGE
     CHECK GET_PREDICTED_POS
 
+Error ideas: Does the image need to be an np array?
+
 """
 
 import rospy
@@ -19,12 +21,14 @@ import sys, select, termios, tty
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.models import model_from_json, Model
-import numpy
+import numpy as np
 import os
 from cv_bridge import CvBridge
 import cv2
 import json
 import rospkg
+from skimage.io import imread
+from skimage.transform import resize
 
 key_actions = {
     'a': 'MOVE_LEFT',
@@ -71,7 +75,7 @@ class PersonTracker(object):
         # change model directory
         r = rospkg.RosPack()
         self.model_path = r.get_path('person_framing')
-        model_name = 'gnarlynet_errorfix'
+        model_name = 'neuralnet_filtered'
         json_file = open(self.model_path+'/models/{}.json'.format(model_name), 'r')
         loaded_model_json = json_file.read()
         json_file.close()
@@ -80,12 +84,74 @@ class PersonTracker(object):
         self.model.load_weights(self.model_path+"/models/{}.h5".format(model_name))
         print("Loaded model from disk")
 
+        # predicted pos
+        self.predicted_pos = None
+
     def get_image(self, m):
         im = self.cv_bridge.imgmsg_to_cv2(m, desired_encoding="bgr8")
         self.image = im
 
-    """def get_predicted_pos(self):
-        predicted_pos = self.model.predict(image)"""
+    def get_predicted_pos(self):
+        # Runs the net on the image if valid img, returns pos (0,0) if not
+        self.image = self.resize_img(self.image)
+        x = 0
+        y = 0
+        if not self.is_grey(self.image):
+            predicted_pos = self.model.predict(self.image)
+            x = predicted_pos[0]
+            y = predicted_pos[1]
+        return x,y
+
+    def resize_img(self,img):
+        resize_factor = 8
+        resized_image = resize(img, (int(480/resize_factor), int(640/resize_factor)))
+        return resized_image
+
+    def is_grey(image, verbose=False, shortcut=True, portion_grey_threshold=0.15, plus_minus_deviation=3):
+        """ Determine if an image is mostly grey due to wonky connection."""
+        
+        total_pixel = image.shape[0] * image.shape[1]
+        num_required_grey_pixel = int(portion_grey_threshold * total_pixel)
+        num_required_normal_pixel = int((1 - portion_grey_threshold) * total_pixel)
+        
+        grey_pixel_count = 0
+        pixel_count = 0
+        for row in range(image.shape[0]):
+            for col in range(image.shape[1]):
+                is_triple = True
+                for channel in range(image.shape[2]):
+                    pixel = image[row][col][channel]
+                    
+                    # resizing image normalizes pixel values, so we need to map it back to 0-255
+                    if isinstance(pixel, float) and pixel < 1.0:
+                        pixel *= 255 
+                    
+                    if not abs(pixel - 128) < plus_minus_deviation:
+                        is_triple = False
+                        continue
+                pixel_count += 1
+                
+                if is_triple:
+                    grey_pixel_count += 1
+                    
+                if shortcut:
+                    if grey_pixel_count > num_required_grey_pixel:
+                        if verbose:
+                            print("pixel_count: {}".format(pixel_count))
+                            print("grey_pixel_count: {}".format(grey_pixel_count))
+                            print("Enough grey pixels: {:.2f}%".format(100 * grey_pixel_count / total_pixel))
+                        return True  # stop as soon as you find enough grey pixels
+                    elif (pixel_count - grey_pixel_count) > num_required_normal_pixel:
+                        if verbose:
+                            print("pixel_count: {}".format(pixel_count))
+                            print("grey_pixel_count: {}".format(grey_pixel_count))
+                            print("Enough normal pixels: {:.2f}%".format((100 * pixel_count - grey_pixel_count) / total_pixel))
+                        return False  # or normal pixels
+                
+        portion_grey = grey_pixel_count * 1.0 / total_pixel
+        if verbose:
+            print("Portion grey: {}".format(portion_grey))
+        return portion_grey > 0.6
 
     # for hypothetical point
     def getKey(self):
@@ -97,6 +163,12 @@ class PersonTracker(object):
     def run(self):
         # Wait for a key to be pressed. Then, update the cmd_vel.
         while not rospy.is_shutdown():
+            # Get array x,y for predicted pos
+            x,y = self.get_predicted_pos()
+            # Turn into PoseStamped
+            self.predicted_pos = PersonTracker.pos_from_xy(x,y)
+            #self.person_pub.publish(self.predicted_pos)
+            print(self.predicted_pos)
 
             """# Really scarily shows a bunch of images, but hey, we get images.
             cv2.imshow("camera image",self.image)
