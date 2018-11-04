@@ -158,21 +158,22 @@ class PersonTracker(object):
     def get_image(self, m):
         im = np.array(self.cv_bridge.imgmsg_to_cv2(m, desired_encoding="bgr8"))
         self.image = im
-        print(type(self.image))
 
     # Runs the net on the image if valid img, returns pos (0,0) if not
     def get_predicted_pos(self,img):
-        if not img:
+        if img is None:
             print("No image")
             return (0,0)
-
         img = self.resize_img(img)
         x = 0
         y = 0
+        img_array = [img]
+        img_array = np.array(img_array)
+        #print(img_array.shape)
         if not is_grey(img):
-            predicted_pos = self.model.predict(img)
-            x = predicted_pos[0]
-            y = predicted_pos[1]
+            predicted_pos = self.model.predict(img_array)
+            x = predicted_pos[0,0]
+            y = predicted_pos[0,1]
         else:
             print("Grey image ignored")
         return x,y
@@ -201,7 +202,7 @@ class PersonTracker(object):
             # Turn into PoseStamped
             self.predicted_pos = PersonTracker.pose_from_xy(x,y)
             #self.person_pub.publish(self.predicted_pos)
-            # print(self.predicted_pos)
+            print(self.predicted_pos)
 
             """# Really scarily shows a bunch of images, but hey, we get images.
             cv2.imshow("camera image",self.image)
