@@ -104,7 +104,8 @@ class PersonTracker(object):
             - node
             - point publisher
             - camera image subscriber
-            - current image
+            - self.image (get from subscriber)
+            - current image (hold one image)
             - CvBridge (converts ros images to opencv (python) images)
             - Image window
             - Neuralnet model
@@ -132,6 +133,7 @@ class PersonTracker(object):
         # SUBSCSRIBER: get camera image
         rospy.Subscriber('camera/image_raw', Image, self.get_image)
         self.image = None
+        self.current_image = None
         self.cv_bridge = CvBridge() # transfers ros images to opencv (python) images
         # shows image
         cv2.namedWindow('camera image')
@@ -159,12 +161,12 @@ class PersonTracker(object):
         print(type(self.image))
 
     # Runs the net on the image if valid img, returns pos (0,0) if not
-    def get_predicted_pos(self):
-        self.image = self.resize_img(self.image)
+    def get_predicted_pos(self,img):
+        img = self.resize_img(img)
         x = 0
         y = 0
-        if not is_grey(self.image):
-            predicted_pos = self.model.predict(self.image)
+        if not is_grey(img):
+            predicted_pos = self.model.predict(img)
             x = predicted_pos[0]
             y = predicted_pos[1]
         else:
@@ -187,10 +189,11 @@ class PersonTracker(object):
     """
 
     def run(self):
-        # Wait for a key to be pressed. Then, update the cmd_vel.
         while not rospy.is_shutdown():
+            # get single image to do stuff to
+            self.current_image = self.image
             # Get array x,y for predicted pos
-            x,y = self.get_predicted_pos()
+            x,y = self.get_predicted_pos(self.current_image)
             # Turn into PoseStamped
             self.predicted_pos = PersonTracker.pose_from_xy(x,y)
             #self.person_pub.publish(self.predicted_pos)
