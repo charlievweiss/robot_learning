@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Uses a neural network to determine the person's position on the screen and velocity.
+Uses a neural network to determine the person's position on the screen
 
 TODO: 
 
@@ -37,6 +37,53 @@ key_actions = {
     's': 'MOVE_BACKWARD',
 }
 
+def is_grey(image, verbose=False, shortcut=True, portion_grey_threshold=0.15, plus_minus_deviation=3):
+    """ Determine if an image is mostly grey due to wonky connection."""
+    
+    total_pixel = image.shape[0] * image.shape[1]
+    num_required_grey_pixel = int(portion_grey_threshold * total_pixel)
+    num_required_normal_pixel = int((1 - portion_grey_threshold) * total_pixel)
+    
+    grey_pixel_count = 0
+    pixel_count = 0
+    for row in range(image.shape[0]):
+        for col in range(image.shape[1]):
+            is_triple = True
+            for channel in range(image.shape[2]):
+                pixel = image[row][col][channel]
+                
+                # resizing image normalizes pixel values, so we need to map it back to 0-255
+                if isinstance(pixel, float) and pixel < 1.0:
+                    pixel *= 255 
+                
+                if not abs(pixel - 128) < plus_minus_deviation:
+                    is_triple = False
+                    continue
+            pixel_count += 1
+            
+            if is_triple:
+                grey_pixel_count += 1
+                
+            if shortcut:
+                if grey_pixel_count > num_required_grey_pixel:
+                    if verbose:
+                        print("pixel_count: {}".format(pixel_count))
+                        print("grey_pixel_count: {}".format(grey_pixel_count))
+                        print("Enough grey pixels: {:.2f}%".format(100 * grey_pixel_count / total_pixel))
+                    return True  # stop as soon as you find enough grey pixels
+                elif (pixel_count - grey_pixel_count) > num_required_normal_pixel:
+                    if verbose:
+                        print("pixel_count: {}".format(pixel_count))
+                        print("grey_pixel_count: {}".format(grey_pixel_count))
+                        print("Enough normal pixels: {:.2f}%".format((100 * pixel_count - grey_pixel_count) / total_pixel))
+                    return False  # or normal pixels
+            
+    portion_grey = grey_pixel_count * 1.0 / total_pixel
+    if verbose:
+        print("Portion grey: {}".format(portion_grey))
+
+    return portion_grey > 0.6
+
 class PersonTracker(object):
     # TODO: put in helper function
     @staticmethod
@@ -52,17 +99,35 @@ class PersonTracker(object):
         return (x, y)
     
     def __init__(self):
+        """
+        Initializes:
+            - node
+            - point publisher
+            - camera image subscriber
+            - current image
+            - CvBridge (converts ros images to opencv (python) images)
+            - Image window
+            - Neuralnet model
+                - json
+                - h5 (weights)
+            - predicted pos
+        """
         rospy.init_node('tracker_net')
 
+        """ OLD: Used for previous digital position
         self.key_pressed = None
         self.settings = termios.tcgetattr(sys.stdin)
         self.movement_magnitude = 0.3
 
         self.mock_point = PersonTracker.pose_from_xy(0,1)  # TODO: Once the neural net is implemented, stop publishing mock_point
+        """
 
         # PUBLISHERS: publish point
         self.person_pub = rospy.Publisher("/person_position", PoseStamped, queue_size=10)
+
+        """ OLD
         self.person_pub.publish(self.mock_point)
+        """
 
         # SUBSCSRIBER: get camera image
         rospy.Subscriber('camera/image_raw', Image, self.get_image)
@@ -71,7 +136,7 @@ class PersonTracker(object):
         # shows image
         cv2.namedWindow('camera image')
 
-        # load model
+        # LOAD MODEL
         # change model directory
         r = rospkg.RosPack()
         self.model_path = r.get_path('person_framing')
@@ -87,78 +152,39 @@ class PersonTracker(object):
         # predicted pos
         self.predicted_pos = None
 
+    # constantly updates current image from camera subscriber and converts to python image/np array
     def get_image(self, m):
-        im = self.cv_bridge.imgmsg_to_cv2(m, desired_encoding="bgr8")
+        im = np.array(self.cv_bridge.imgmsg_to_cv2(m, desired_encoding="bgr8"))
         self.image = im
+        print(type(self.image))
 
+    # Runs the net on the image if valid img, returns pos (0,0) if not
     def get_predicted_pos(self):
-        # Runs the net on the image if valid img, returns pos (0,0) if not
         self.image = self.resize_img(self.image)
         x = 0
         y = 0
-        if not self.is_grey(self.image):
+        if not is_grey(self.image):
             predicted_pos = self.model.predict(self.image)
             x = predicted_pos[0]
             y = predicted_pos[1]
+        else:
+            print("Grey image ignored")
         return x,y
 
+    # downsamples image
     def resize_img(self,img):
         resize_factor = 8
         resized_image = resize(img, (int(480/resize_factor), int(640/resize_factor)))
         return resized_image
 
-    def is_grey(image, verbose=False, shortcut=True, portion_grey_threshold=0.15, plus_minus_deviation=3):
-        """ Determine if an image is mostly grey due to wonky connection."""
-        
-        total_pixel = image.shape[0] * image.shape[1]
-        num_required_grey_pixel = int(portion_grey_threshold * total_pixel)
-        num_required_normal_pixel = int((1 - portion_grey_threshold) * total_pixel)
-        
-        grey_pixel_count = 0
-        pixel_count = 0
-        for row in range(image.shape[0]):
-            for col in range(image.shape[1]):
-                is_triple = True
-                for channel in range(image.shape[2]):
-                    pixel = image[row][col][channel]
-                    
-                    # resizing image normalizes pixel values, so we need to map it back to 0-255
-                    if isinstance(pixel, float) and pixel < 1.0:
-                        pixel *= 255 
-                    
-                    if not abs(pixel - 128) < plus_minus_deviation:
-                        is_triple = False
-                        continue
-                pixel_count += 1
-                
-                if is_triple:
-                    grey_pixel_count += 1
-                    
-                if shortcut:
-                    if grey_pixel_count > num_required_grey_pixel:
-                        if verbose:
-                            print("pixel_count: {}".format(pixel_count))
-                            print("grey_pixel_count: {}".format(grey_pixel_count))
-                            print("Enough grey pixels: {:.2f}%".format(100 * grey_pixel_count / total_pixel))
-                        return True  # stop as soon as you find enough grey pixels
-                    elif (pixel_count - grey_pixel_count) > num_required_normal_pixel:
-                        if verbose:
-                            print("pixel_count: {}".format(pixel_count))
-                            print("grey_pixel_count: {}".format(grey_pixel_count))
-                            print("Enough normal pixels: {:.2f}%".format((100 * pixel_count - grey_pixel_count) / total_pixel))
-                        return False  # or normal pixels
-                
-        portion_grey = grey_pixel_count * 1.0 / total_pixel
-        if verbose:
-            print("Portion grey: {}".format(portion_grey))
-        return portion_grey > 0.6
-
+    """ OLD:
     # for hypothetical point
     def getKey(self):
         tty.setraw(sys.stdin.fileno())
         select.select([sys.stdin], [], [], 0)
         self.key_pressed = sys.stdin.read(1)
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
+    """
 
     def run(self):
         # Wait for a key to be pressed. Then, update the cmd_vel.
@@ -166,7 +192,7 @@ class PersonTracker(object):
             # Get array x,y for predicted pos
             x,y = self.get_predicted_pos()
             # Turn into PoseStamped
-            self.predicted_pos = PersonTracker.pos_from_xy(x,y)
+            self.predicted_pos = PersonTracker.pose_from_xy(x,y)
             #self.person_pub.publish(self.predicted_pos)
             print(self.predicted_pos)
 
@@ -176,7 +202,7 @@ class PersonTracker(object):
             cv2.destroyAllWindows()"""
             
 
-        """
+        """ OLD:
         while self.key_pressed != '\x03': # ctrl-C
             self.getKey()
 
@@ -206,7 +232,8 @@ class PersonTracker(object):
         """
 
 if __name__ == "__main__":
-    """# Print out teleop options
+    """ OLD:
+    # Print out teleop options
     print "Use the following keys to move the Neato around:"
     for k in key_actions.keys():
         print "'{}' : \t{}".format(k, key_actions[k])"""
