@@ -162,6 +162,10 @@ class PersonTracker(object):
 
     # Runs the net on the image if valid img, returns pos (0,0) if not
     def get_predicted_pos(self,img):
+        if not img:
+            print("No image")
+            return (0,0)
+
         img = self.resize_img(img)
         x = 0
         y = 0
@@ -197,7 +201,7 @@ class PersonTracker(object):
             # Turn into PoseStamped
             self.predicted_pos = PersonTracker.pose_from_xy(x,y)
             #self.person_pub.publish(self.predicted_pos)
-            print(self.predicted_pos)
+            # print(self.predicted_pos)
 
             """# Really scarily shows a bunch of images, but hey, we get images.
             cv2.imshow("camera image",self.image)
