@@ -58,7 +58,7 @@ class Follower(object):
         angle_tolerance = math.radians(1)
 
         object_distance, object_angle = self.get_polar_baselink_object_pos()
-        print("object_distance = {}\nobject_angle  = {}".format(object_distance, object_angle))
+        #print("object_distance = {}\nobject_angle  = {}".format(object_distance, object_angle))
 
 
 
@@ -78,9 +78,7 @@ class Follower(object):
             angular_vel = 0.0
             linear_vel = 0.0
 
-        print("""cmd_vel:
-    linear  = {}
-    angular = {}\n""".format(linear_vel, angular_vel))
+        #print("""cmd_vel:linear  = {}angular = {}\n""".format(linear_vel, angular_vel))
 
         return (linear_vel, angular_vel)
 

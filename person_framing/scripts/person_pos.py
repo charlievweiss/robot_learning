@@ -137,7 +137,7 @@ class PersonTracker(object):
         # change model directory
         r = rospkg.RosPack()
         self.model_path = r.get_path('person_framing')
-        model_name = 'neuralnet_filtered'
+        model_name = 'neuralnet_conv_maxpool_dense'
         json_file = open(self.model_path+'/models/{}.json'.format(model_name), 'r')
         loaded_model_json = json_file.read()
         json_file.close()
@@ -197,7 +197,7 @@ class PersonTracker(object):
             # Turn into PoseStamped
             self.predicted_pos = PersonTracker.pose_from_xy(x,y)
             self.person_pub.publish(self.predicted_pos)
-            #print(self.predicted_pos)
+            print(self.predicted_pos)
 
             """# Really scarily shows a bunch of images, but hey, we get images.
             cv2.imshow("camera image",self.image)
