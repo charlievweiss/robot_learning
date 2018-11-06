@@ -29,8 +29,10 @@ class Follower(object):
         self.object_pose = None # PoseStamped message
         self.turning_tolerance = .05 
         # change these if the robot's too slow:
-        self.max_lin_vel = .5
-        self.max_ang_vel = .5
+        #self.max_lin_vel = .5
+        #self.max_ang_vel = .5
+        self.p_lin = .5 # proportional control, multiply by distance
+        self.p_ang = .5 # proportional control for angle
 
     def set_object_pose(self, msg):
         # updates whenever something is published to /person_position
@@ -39,17 +41,25 @@ class Follower(object):
         # self.object_pos = Point(x=x, y=y, z=0)
 
     def get_polar_baselink_object_pos(self):
-        baselink = self.tf_listener.transformPose('base_link', self.object_pose)
-        x = baselink.pose.position.x
-        y = baselink.pose.position.y
-        return math.sqrt(x**2 + y**2), math.atan2(-y, x) # radius, angle
+        # OLD?
+        #baselink = self.tf_listener.transformPose('odom', self.object_pose)
+        #x = baselink.pose.position.x
+        #y = baselink.pose.position.y
+        
+        x = self.object_pose.pose.position.x
+        y = self.object_pose.pose.position.y
+        
+        return x, y, math.sqrt(x**2 + y**2), math.atan2(y,x) # radius, angle
+        #return x, y, math.sqrt(x**2 + y**2), math.atan2(y,x) # radius, angle
 
+    """ OLD
     def calculate_distance(self):
         # calculate the distance between the bot and the person
         x, y = self.object_pose
         # x = self.object_pos.x
         # y = self.object_pos.y
         return math.sqrt(x**2+y**2)
+    """
 
     def calc_movement(self):
         # TODO: Move this block to init.
@@ -57,47 +67,14 @@ class Follower(object):
         distance_tolerance = 0.1  # don't move if distance is within this range
         angle_tolerance = math.radians(1)
 
-        object_distance, object_angle = self.get_polar_baselink_object_pos()
+        x, y, object_distance, object_angle = self.get_polar_baselink_object_pos()
         #print("object_distance = {}\nobject_angle  = {}".format(object_distance, object_angle))
 
+        linear_vel = (object_distance-1) * self.p_lin
+        angular_vel = object_angle * self.p_ang
 
-
-        if object_angle > angle_tolerance:
-            angular_vel = -1 * self.max_ang_vel
-            linear_vel = 0.0
-        elif object_angle < -1 * angle_tolerance:
-            angular_vel = self.max_ang_vel
-            linear_vel = 0.0
-        elif object_distance > target_distance + distance_tolerance / 2:
-            angular_vel = 0.0
-            linear_vel = self.max_lin_vel
-        elif object_distance < target_distance - distance_tolerance / 2:
-            angular_vel = 0.0
-            linear_vel = -1 * self.max_lin_vel
-        else:
-            angular_vel = 0.0
-            linear_vel = 0.0
-
-        #print("""cmd_vel:linear  = {}angular = {}\n""".format(linear_vel, angular_vel))
-
+        print("x: {} y: {} dist: {} ang: {} ang_vel: {} lin_vel: {}".format(x, y, object_distance,object_angle,angular_vel,linear_vel))
         return (linear_vel, angular_vel)
-
-        # # really basic, just move based on high/low
-        # x = self.object_pos.x # position of person
-        # object_distance = calculate_distance() # person distance away
-        # # first turn, then go forward/backward
-        # if x > self.turning_tolerance: # turn left
-        #     self.angular_vel = self.max_ang_vel
-        #     self.linear_vel = 0.0
-        # elif x < -1 * self.turning_tolerance: # turn right
-        #     self.angular_vel = -1*self.max_ang_vel
-        #     self.linear_vel = 0.0
-        # elif object_distance > 1: # go forward
-        #     self.linear_vel = self.max_lin_vel
-        # elif object_distance < 1: # go backward
-        #     self.linear_vel = -1*self.max_lin_vel
-        # else:
-        #     print("Well something's wrong with your movement")
 
     def matt_pls(self):
         print("Let's call that a stretch goal.")
@@ -107,7 +84,9 @@ class Follower(object):
             # self.matt_pls()
             if self.object_pose:
                 linear_vel, angular_vel = self.calc_movement()
-                cmd_vel = Twist(linear=Vector3(x=linear_vel), angular=Vector3(z=angular_vel))
+                #cmd_vel = Twist(linear=Vector3(x=linear_vel), angular=Vector3(z=angular_vel))
+                #cmd_vel = Twist(linear=Vector3(x=0), angular=Vector3(z=angular_vel))
+                cmd_vel = Twist(linear=Vector3(x=0), angular=Vector3(z=0))
                 self.publish_vel.publish(cmd_vel)
                 #print(cmd_vel)
 

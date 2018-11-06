@@ -84,7 +84,7 @@ class PersonTracker(object):
     @staticmethod
     def pose_from_xy(x, y):
         msg = PoseStamped(pose=Pose(position=Point(x, y, 0), orientation=Quaternion(0,0,0,0)))
-        msg.header.frame_id = 'odom'
+        msg.header.frame_id = "base_link"
         return msg
 
     @staticmethod
@@ -110,25 +110,22 @@ class PersonTracker(object):
         """
         rospy.init_node('tracker_net')
 
-        """ OLD: Used for previous digital position
+        """#OLD: Used for previous digital position
         self.key_pressed = None
         self.settings = termios.tcgetattr(sys.stdin)
         self.movement_magnitude = 0.3
 
         self.mock_point = PersonTracker.pose_from_xy(0,1)  # TODO: Once the neural net is implemented, stop publishing mock_point
         """
-
         # PUBLISHERS: publish point
         self.person_pub = rospy.Publisher("/person_position", PoseStamped, queue_size=10)
 
-        """ OLD
+        """#OLD
         self.person_pub.publish(self.mock_point)
         """
-
         # SUBSCSRIBER: get camera image
         rospy.Subscriber('camera/image_raw', Image, self.get_image)
         self.image = None
-        self.current_image = None
         self.cv_bridge = CvBridge() # transfers ros images to opencv (python) images
         # shows image
         cv2.namedWindow('camera image')
@@ -137,7 +134,7 @@ class PersonTracker(object):
         # change model directory
         r = rospkg.RosPack()
         self.model_path = r.get_path('person_framing')
-        model_name = 'neuralnet_conv_maxpool_dense'
+        model_name = 'neuralnet_comproboroom3'
         json_file = open(self.model_path+'/models/{}.json'.format(model_name), 'r')
         loaded_model_json = json_file.read()
         json_file.close()
@@ -171,41 +168,42 @@ class PersonTracker(object):
             y = predicted_pos[0,1]
         else:
             print("Grey image ignored")
+        print("x: {} y: {}".format(x,y))
         return x,y
 
     # downsamples image
     def resize_img(self,img):
-        resize_factor = 8
+        resize_factor = 4
         resized_image = resize(img, (int(480/resize_factor), int(640/resize_factor)))
         return resized_image
 
-    """ OLD:
+    #OLD:
     # for hypothetical point
     def getKey(self):
         tty.setraw(sys.stdin.fileno())
         select.select([sys.stdin], [], [], 0)
         self.key_pressed = sys.stdin.read(1)
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
-    """
+    
 
     def run(self):
         while not rospy.is_shutdown():
             # get single image to do stuff to
-            self.current_image = self.image
+            current_image = self.image
             # Get array x,y for predicted pos
-            x,y = self.get_predicted_pos(self.current_image)
+            x,y = self.get_predicted_pos(current_image)
             # Turn into PoseStamped
             self.predicted_pos = PersonTracker.pose_from_xy(x,y)
             self.person_pub.publish(self.predicted_pos)
-            print(self.predicted_pos)
+            #print(self.predicted_pos)
 
-            """# Really scarily shows a bunch of images, but hey, we get images.
+            # Really scarily shows a bunch of images, but hey, we get images.
             cv2.imshow("camera image",self.image)
             key = cv2.waitKey(100)
-            cv2.destroyAllWindows()"""
+            #cv2.destroyAllWindows()
             
 
-        """ OLD:
+        """#OLD:
         while self.key_pressed != '\x03': # ctrl-C
             self.getKey()
 
@@ -233,13 +231,14 @@ class PersonTracker(object):
             else:
                 print "Invalid key"
         """
+        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    """ OLD:
+    """#OLD:
     # Print out teleop options
     print "Use the following keys to move the Neato around:"
     for k in key_actions.keys():
-        print "'{}' : \t{}".format(k, key_actions[k])"""
-
+        print "'{}' : \t{}".format(k, key_actions[k])
+    """
     node = PersonTracker()
     node.run()
